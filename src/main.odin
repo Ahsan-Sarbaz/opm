@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:io"
 import "core:os"
 import "core:strings"
+import "core:time"
 
 is_verbose := false
 main_odin_src := `package main
@@ -129,9 +130,36 @@ Create a new project in the given directory.
 Options: --verbose
          --help
          --version
+         --license, --l
+         --authors, --a
+
 Example: opm game
-Example: opm --verbose game
+Example: opm game --license MIT --authors "Ahsan Ullah"
+Example: opm game --verbose
 Example: opm --help
+`
+
+mit_license_text := `MIT License
+
+Copyright (c) %d %s
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 `
 
 main :: proc() {
@@ -141,13 +169,59 @@ main :: proc() {
 		return
 	}
 
-    project_dir : string = " "
+    project_dir : string = ""
 
-    for arg, index in os.args[1:] {
+    licenses := make(map[string]string)
+    licenses["mit"] = mit_license_text
+
+    selected_license := ""
+    auther := ""
+    readme := false
+
+    args := os.args[1:]
+    skip_next := false
+
+    for arg, index in args {
+        if skip_next {
+            skip_next = false
+            continue
+        }
+
         if strings.has_prefix(arg, "--")  {
-            if arg == "--version" {
-                
-            } else if arg == "--help" {
+            if arg == "--license" || arg == "--l" {
+                if index + 1 < len(args) {
+                    license_name := strings.to_lower((args[index + 1]))
+                    if license_name in licenses {
+                        selected_license = license_name
+                    }
+                    else {
+                        fmt.println("Unknown license name: ", license_name)
+                        return
+                    }
+                }
+                else {
+                    fmt.println("Missing license name")
+                    return
+                }
+
+                skip_next = true
+
+            }
+            else if arg == "--authors" || arg == "--a" {
+                if index + 1 < len(args) {
+                    auther = args[index + 1]
+                }
+                else {
+                    fmt.println("Missing authors")
+                    return
+                }
+
+                skip_next = true
+            }
+            else if arg == "--readme" {
+                readme = true
+            }
+            else if arg == "--help" {
                 fmt.println(help_string)
                 return
             } else if arg == "--verbose" {
@@ -170,6 +244,20 @@ main :: proc() {
 	if !create_required_directories(project_dir) || !create_required_files(project_dir) {
 		return
 	}
+
+    if selected_license != "" && auther != "" {
+        sb := strings.Builder{}
+        year := time.year(time.now())
+        text := fmt.sbprintfln(&sb, licenses[selected_license], year, auther)
+        create_file_and_write(strings.concatenate({project_dir, "/LICENSE"}), text)
+    }
+
+    if readme {
+        readme_text := `### %s`
+        sb := strings.Builder{}
+        text := fmt.sbprintfln(&sb, readme_text, project_dir)
+        create_file_and_write(strings.concatenate({project_dir, "/README.md"}), text)
+    }
 
     if is_verbose {
         fmt.println("Created project in: ", project_dir)
